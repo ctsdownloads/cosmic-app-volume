@@ -10,25 +10,42 @@ COSMIC ships with a sound applet (`cosmic-applet-audio`) that gives you master o
 
 System76 has acknowledged this gap and explicitly deferred it: see [pop-os/cosmic-settings #6](https://github.com/pop-os/cosmic-settings/issues/6) — *"Do not include per-application volume levels. These can arrive in COSMIC V2."* With COSMIC currently in Epoch 1 and Epoch 2 / Epoch 3 still on the roadmap, that's likely a 2026 / 2027 timeline. This applet fills the gap **now**.
 
-This applet is a fork of `cosmic-applet-audio` — it keeps everything System76 built (so you don't lose anything by switching to it) and adds the per-app section underneath. Specifically, this applet does **everything the stock applet does**, plus:
+This applet is a fork of `cosmic-applet-audio` — it keeps everything System76 built (so you don't lose anything by switching to it) and adds the per-app section underneath. Feature comparison:
 
 | Feature | Stock `cosmic-applet-audio` | `cosmic-app-volume` (this) |
 | --- | --- | --- |
-| Master output volume + mute | ✅ | ✅ |
-| Master input volume + mute | ✅ | ✅ |
-| Output device picker | ✅ | ✅ |
-| Input device picker | ✅ | ✅ |
-| Scroll-wheel volume on icon | ✅ | ✅ |
-| MPRIS now-playing + transport | ✅ | ✅ |
-| **Per-app volume sliders** | ❌ | ✅ |
-| **Per-app mute toggles** | ❌ | ✅ |
-| **Per-app output routing** (move app's audio to a different device) | ❌ | ✅ |
-| **Per-app input routing** (move app's mic source to a different device) | ❌ | ✅ |
-| **Per-app recording control** (mic-using apps shown separately) | ❌ | ✅ |
-| **App icons + large names** in the mixer | ❌ | ✅ |
-| **Scrollable popup** when many apps are playing | ❌ | ✅ |
+| Master output volume + mute | Yes | Yes |
+| Master input volume + mute | Yes | Yes |
+| Output device picker | Yes | Yes |
+| Input device picker | Yes | Yes |
+| Scroll-wheel volume on icon | Yes | Yes |
+| MPRIS now-playing + transport | Yes | Yes |
+| Per-app volume sliders | No | Yes |
+| Per-app mute toggles | No | Yes |
+| Per-app output routing | No | Yes |
+| Per-app input routing | No | Yes |
+| Per-app recording control | No | Yes |
+| App icons + large names in the mixer | No | Yes |
+| Scrollable popup when many apps are playing | No | Yes |
 
 You can run this **alongside** the stock applet, but most people will want to remove the stock applet from their panel after installing this one — they look almost identical at the top, and having both is redundant.
+
+## Send any app to any output. Send any app to any input.
+
+This is the whole point of the applet, so it's worth being explicit:
+
+**Every app currently playing audio gets its own Output picker.** Click it and you'll see every output device on your system — laptop speakers, USB DAC, Bluetooth headphones, an HDMI monitor's audio, an Easy Effects sink, anything PipeWire knows about. Pick one and that app's audio moves there immediately. The system default doesn't change. Other apps stay where they are.
+
+**Every app currently capturing microphone audio gets its own Input picker.** Same flow — click, see every input device, pick one, and that app starts recording from there.
+
+Concrete examples of what this means:
+
+- Spotify on your Bluetooth headphones, Discord notifications staying on your laptop speakers
+- Browser tab playing a meeting on your USB headset, OBS recording from your XLR mic
+- Two Firefox windows playing different things, each on a different output
+- Discord call recording from your headset mic, while Audacity records from a different USB mic at the same time
+
+The applet doesn't care what the app is or which device it picked when it started. Anything to anything.
 
 ## Screenshots
 
@@ -68,9 +85,9 @@ You'll also need the standard COSMIC build dependencies (Wayland headers, xkbcom
 
 ### Verified package names per distro
 
-> **Important:** the package containing the libpulse C headers has a different name on every distro. The runtime library is almost always already installed; what you need to add is the `-dev` / `-devel` package.
+The package containing the libpulse C headers has a different name on every distro. The runtime library is almost always already installed; what you need to add is the development package.
 
-#### Arch / CachyOS / Manjaro
+#### Arch / CachyOS
 
 ```sh
 sudo pacman -S libpulse rust just pkgconf base-devel wayland libxkbcommon
@@ -78,23 +95,15 @@ sudo pacman -S libpulse rust just pkgconf base-devel wayland libxkbcommon
 
 The Arch [`libpulse`](https://archlinux.org/packages/extra/x86_64/libpulse/) package includes both the runtime library and the headers — there is no separate `-dev` package on Arch.
 
-#### Fedora / Nobara / Bazzite
+#### Fedora
 
 ```sh
 sudo dnf install pulseaudio-libs-devel rust cargo just pkgconf-pkg-config wayland-devel libxkbcommon-devel
 ```
 
-The package is [`pulseaudio-libs-devel`](https://packages.fedoraproject.org/pkgs/pulseaudio/pulseaudio-libs-devel/) even on PipeWire-based Fedora — the package provides the libpulse headers, not the PulseAudio daemon.
+The package is [`pulseaudio-libs-devel`](https://packages.fedoraproject.org/pkgs/pulseaudio/pulseaudio-libs-devel/) even on PipeWire-based Fedora — it provides the libpulse headers, not the PulseAudio daemon.
 
-#### Bluefin / Aurora / other rpm-ostree systems
-
-```sh
-rpm-ostree install pulseaudio-libs-devel
-```
-
-Then reboot, then install Rust and `just` via your normal user-space tooling (e.g. `brew install rust just` or `cargo install just` after installing rustup).
-
-#### Ubuntu / Pop!_OS / Debian / Linux Mint
+#### Ubuntu / Pop!_OS
 
 ```sh
 sudo apt install libpulse-dev build-essential pkg-config libwayland-dev libxkbcommon-dev
@@ -102,13 +111,7 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 cargo install just
 ```
 
-The package is [`libpulse-dev`](https://packages.ubuntu.com/libpulse-dev) on Ubuntu/Debian. It pulls in `libpulse0` (the runtime) automatically. On Ubuntu 24.04 LTS it lives in `universe`, which is enabled by default.
-
-#### openSUSE Tumbleweed / Leap
-
-```sh
-sudo zypper install libpulse-devel rust cargo just pkgconf-pkg-config wayland-devel libxkbcommon-devel
-```
+The package is [`libpulse-dev`](https://packages.ubuntu.com/libpulse-dev) on Ubuntu/Pop!_OS. It pulls in `libpulse0` (the runtime) automatically. On Ubuntu 24.04 LTS it lives in `universe`, which is enabled by default.
 
 > **If the build fails with a missing header error,** install the corresponding `-dev` (Debian-family) or `-devel` (RPM-family) package for whatever it can't find. See the [cosmic-epoch README](https://github.com/pop-os/cosmic-epoch) for the full list of build dependencies COSMIC itself needs.
 
@@ -165,13 +168,13 @@ Once it's in place and you've confirmed it works, you'll probably want to **remo
 
 - App icon (32px) and app name (18px) at the top
 - Volume slider 0–150% with mute toggle on the left
-- Current output device shown beneath; click the row to expand a picker and move that app's audio to any other available output
+- Current output device shown beneath; click the row to expand a picker and route that app to **any** other available output
 
 **Recording section** shows every app currently capturing audio (Discord during a call, OBS recording, browser meetings, etc.):
 
 - Same large name and icon
 - Volume slider with mic-style mute toggle
-- Current input device shown beneath; click to expand and route that app to a different microphone
+- Current input device shown beneath; click to expand and route that app to **any** other available microphone
 
 **Sound Settings…** at the bottom opens the COSMIC Settings sound page for advanced configuration (sample rates, profiles, etc.).
 
