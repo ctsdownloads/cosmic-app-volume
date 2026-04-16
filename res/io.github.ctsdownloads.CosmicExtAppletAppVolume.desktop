@@ -1,0 +1,14 @@
+[Desktop Entry]
+Name=App Volume
+Comment=Per-application volume control
+Type=Application
+Exec=cosmic-ext-applet-app-volume
+Terminal=false
+Categories=COSMIC;
+Keywords=COSMIC;Volume;Audio;Mixer;Sound;
+Icon=audio-volume-high-symbolic
+NoDisplay=true
+X-CosmicApplet=true
+X-CosmicHoverPopup=Auto
+X-OverflowPriority=10
+X-HostWaylandDisplay=true

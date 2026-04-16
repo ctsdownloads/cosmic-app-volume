@@ -1,0 +1,41 @@
+[package]
+name = "cosmic-ext-applet-app-volume"
+version = "0.2.0"
+edition = "2024"
+license = "GPL-3.0-only"
+description = "Per-application volume control applet for COSMIC (forked from cosmic-applet-audio)"
+
+[lib]
+name = "cosmic_ext_applet_app_volume"
+path = "src/lib.rs"
+
+[[bin]]
+name = "cosmic-ext-applet-app-volume"
+path = "src/main.rs"
+
+[dependencies]
+libcosmic = { git = "https://github.com/pop-os/libcosmic.git", default-features = false, features = [
+    "applet",
+    "applet-token",
+    "dbus-config",
+    "multi-window",
+    "tokio",
+    "wayland",
+    "desktop-systemd-scope",
+    "winit",
+] }
+i18n-embed = { version = "0.16", features = ["fluent-system", "desktop-requester"] }
+i18n-embed-fl = "0.10"
+rust-embed = "8"
+serde = { version = "1", features = ["derive"] }
+tokio = { version = "1", features = ["rt", "sync", "time", "macros"] }
+tracing = "0.1"
+tracing-log = "0.2"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+url = "2"
+urlencoding = "2.1.3"
+zbus = { version = "5", default-features = false, features = ["tokio"] }
+mpris2-zbus = { git = "https://github.com/pop-os/dbus-settings-bindings" }
+cosmic-settings-sound-subscription = { git = "https://github.com/pop-os/cosmic-settings" }
+libpulse-binding = "2"
+once_cell = "1"
