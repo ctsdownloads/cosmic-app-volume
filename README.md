@@ -8,7 +8,7 @@ A COSMIC desktop panel applet that adds **per-application volume control and per
 
 COSMIC ships with a sound applet (`cosmic-applet-audio`) that gives you master output volume, master input volume, and a picker for which output / input device the system uses. **What it does not give you is per-application control.** If Spotify is too loud while you're on a Discord call, your only option today is to open `pavucontrol` and use it as a separate app.
 
-System76 has acknowledged this gap and explicitly deferred it: see [pop-os/cosmic-settings #6](https://github.com/pop-os/cosmic-settings/issues/6) — *"Do not include per-application volume levels. These can arrive in COSMIC V2."* With COSMIC currently in Epoch 1 and Epoch 2 / Epoch 3 still on the roadmap, that's likely a 2026 / 2027 timeline. This applet fills the gap **now**.
+System76 has acknowledged this gap and explicitly deferred it: see [pop-os/cosmic-settings #6](https://github.com/pop-os/cosmic-settings/issues/6) — *"Do not include per-application volume levels. These can arrive in COSMIC V2."* This applet fills the gap **now**.
 
 This applet is a fork of `cosmic-applet-audio` — it keeps everything System76 built (so you don't lose anything by switching to it) and adds the per-app section underneath. Feature comparison:
 
