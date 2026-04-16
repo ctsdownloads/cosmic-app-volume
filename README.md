@@ -76,6 +76,7 @@ The popup expands the master volume controls at the top, then any active media p
 - [COSMIC desktop](https://github.com/pop-os/cosmic-epoch) (Epoch 1 / 1.0.x or later)
 - [PipeWire](https://pipewire.org/) with the PulseAudio compatibility layer (default on every modern distro that ships PipeWire)
 - PulseAudio client library development headers (this is a **build-time** dependency)
+- PipeWire development headers (required by `cosmic-settings-sound-subscription` at build time)
 - Rust toolchain (`rustc` + `cargo`)
 - [`just`](https://github.com/casey/just) command runner
 
@@ -90,15 +91,15 @@ The package containing the libpulse C headers has a different name on every dist
 #### Arch / CachyOS
 
 ```sh
-sudo pacman -S libpulse rust just pkgconf base-devel wayland libxkbcommon
+sudo pacman -S libpulse libpipewire clang rust just pkgconf base-devel wayland libxkbcommon
 ```
 
-The Arch [`libpulse`](https://archlinux.org/packages/extra/x86_64/libpulse/) package includes both the runtime library and the headers — there is no separate `-dev` package on Arch.
+The Arch [`libpulse`](https://archlinux.org/packages/extra/x86_64/libpulse/) package includes both the runtime library and the headers — there is no separate `-dev` package on Arch. The `libpipewire` package is required because `cosmic-settings-sound-subscription` links against PipeWire's SPA headers at build time.
 
 #### Fedora
 
 ```sh
-sudo dnf install pulseaudio-libs-devel rust cargo just pkgconf-pkg-config wayland-devel libxkbcommon-devel
+sudo dnf install pulseaudio-libs-devel pipewire-devel clang-devel rust cargo just pkgconf-pkg-config wayland-devel libxkbcommon-devel
 ```
 
 The package is [`pulseaudio-libs-devel`](https://packages.fedoraproject.org/pkgs/pulseaudio/pulseaudio-libs-devel/) even on PipeWire-based Fedora — it provides the libpulse headers, not the PulseAudio daemon.
@@ -106,7 +107,7 @@ The package is [`pulseaudio-libs-devel`](https://packages.fedoraproject.org/pkgs
 #### Ubuntu / Pop!_OS
 
 ```sh
-sudo apt install libpulse-dev build-essential pkg-config libwayland-dev libxkbcommon-dev
+sudo apt install libpulse-dev libpipewire-0.3-dev libclang-dev build-essential pkg-config libwayland-dev libxkbcommon-dev
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 cargo install just
 ```
@@ -123,8 +124,9 @@ Run these three checks first — they take 5 seconds and save you from a half-ho
 # 1. PipeWire's PulseAudio compat is running (you should see a number, not an error)
 pactl info | grep "Server Name"
 
-# 2. libpulse headers are installed (should print a path, not "not found")
+# 2. libpulse and PipeWire headers are installed (should print paths, not "not found")
 pkg-config --cflags libpulse
+pkg-config --cflags libpipewire-0.3
 
 # 3. Rust + just are installed
 rustc --version && just --version
