@@ -104,6 +104,74 @@ sudo dnf install pulseaudio-libs-devel pipewire-devel clang-devel rust cargo jus
 
 The package is [`pulseaudio-libs-devel`](https://packages.fedoraproject.org/pkgs/pulseaudio/pulseaudio-libs-devel/) even on PipeWire-based Fedora — it provides the libpulse headers, not the PulseAudio daemon.
 
+#### Fedora Atomic (COSMIC spin) / Origami
+
+On immutable Fedora variants, `/usr` is read-only and you don't want to layer a full build toolchain with `rpm-ostree`. Build inside a Fedora distrobox, then use `just install-user` to install user-local to `~/.local`. Full tested procedure:
+
+1. Create and enter a Fedora 43 distrobox:
+
+   ```sh
+   distrobox create --name cosmic-build --image registry.fedoraproject.org/fedora-toolbox:43
+   distrobox enter cosmic-build
+   ```
+
+2. Inside the container, install build deps:
+
+   ```sh
+   sudo dnf install -y pulseaudio-libs-devel pipewire-devel clang-devel \
+     rust cargo just pkgconf-pkg-config wayland-devel libxkbcommon-devel \
+     gcc gcc-c++ git
+   ```
+
+3. Verify the toolchain:
+
+   ```sh
+   pkg-config --cflags libpulse
+   pkg-config --cflags libpipewire-0.3
+   rustc --version && just --version
+   ```
+
+4. Clone:
+
+   ```sh
+   cd ~
+   git clone https://github.com/ctsdownloads/cosmic-app-volume.git
+   cd cosmic-app-volume
+   ```
+
+5. Build and install user-local (3–5 min first time):
+
+   ```sh
+   just install-user
+   ```
+
+6. Verify the install landed:
+
+   ```sh
+   ls ~/.local/bin/cosmic-ext-applet-app-volume
+   grep ^Exec= ~/.local/share/applications/io.github.ctsdownloads.CosmicExtAppletAppVolume.desktop
+   ```
+
+   `grep` should show `Exec=/home/$USER/.local/bin/cosmic-ext-applet-app-volume`.
+
+7. Exit the container:
+
+   ```sh
+   exit
+   ```
+
+8. On the host, restart the COSMIC panel:
+
+   ```sh
+   killall cosmic-panel
+   ```
+
+9. COSMIC: **Settings → Desktop → Panel → Configure Panel Applets → + Add Applet → drag App Volume** in.
+
+10. Optional: remove the stock Sound applet from the panel.
+
+Uninstall later: from inside the cloned repo on the host, `just uninstall-user`, then `killall cosmic-panel`, then remove from the panel in Settings.
+
 #### Ubuntu / Pop!_OS
 
 ```sh
