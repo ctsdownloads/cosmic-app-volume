@@ -99,7 +99,13 @@ The Arch [`libpulse`](https://archlinux.org/packages/extra/x86_64/libpulse/) pac
 #### Fedora
 
 ```sh
-sudo dnf install pulseaudio-libs-devel pipewire-devel clang-devel rust cargo just pkgconf-pkg-config wayland-devel libxkbcommon-devel
+sudo dnf install pulseaudio-libs-devel pipewire-devel \
+  gcc gcc-c++ cmake pkgconf-pkg-config just git \
+  rust cargo clang-devel \
+  systemd-devel \
+  wayland-devel libxkbcommon-devel mesa-libEGL-devel \
+  libinput-devel libseat-devel \
+  expat-devel fontconfig-devel freetype-devel
 ```
 
 The package is [`pulseaudio-libs-devel`](https://packages.fedoraproject.org/pkgs/pulseaudio/pulseaudio-libs-devel/) even on PipeWire-based Fedora — it provides the libpulse headers, not the PulseAudio daemon.
@@ -118,9 +124,13 @@ On immutable Fedora variants, `/usr` is read-only and you don't want to layer a 
 2. Inside the container, install build deps:
 
    ```sh
-   sudo dnf install -y pulseaudio-libs-devel pipewire-devel clang-devel \
-     rust cargo just pkgconf-pkg-config wayland-devel libxkbcommon-devel \
-     gcc gcc-c++ git
+   sudo dnf install -y pulseaudio-libs-devel pipewire-devel \
+     gcc gcc-c++ cmake pkgconf-pkg-config just git \
+     rust cargo clang-devel \
+     systemd-devel \
+     wayland-devel libxkbcommon-devel mesa-libEGL-devel \
+     libinput-devel libseat-devel \
+     expat-devel fontconfig-devel freetype-devel
    ```
 
 3. Verify the toolchain:
