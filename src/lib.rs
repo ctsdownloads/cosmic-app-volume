@@ -143,7 +143,7 @@ pub enum Message {
     Token(TokenUpdate),
     OpenSettings,
     Subscription(css::Message),
-    Surface(surface::Action),
+    Surface(surface::Action<Message>),
     PulseUpdate(crate::pulse::StreamSnapshot),
     SetAppVolume(u32, u32),
     ToggleAppMute(u32),
@@ -546,13 +546,11 @@ impl cosmic::Application for Audio {
                         cmd.env("XDG_ACTIVATION_TOKEN", &token);
                         cmd.env("DESKTOP_STARTUP_ID", &token);
                     }
-                    tokio::spawn(cosmic::process::spawn(cmd));
+                    tokio::spawn(cosmic_launch::process::spawn(cmd));
                 }
             },
             Message::Surface(a) => {
-                return cosmic::task::message(cosmic::Action::Cosmic(
-                    cosmic::app::Action::Surface(a),
-                ));
+                return cosmic::task::message(cosmic::Action::Surface(a));
             }
             Message::PulseUpdate(snapshot) => {
                 self.app_streams = snapshot.apps;
