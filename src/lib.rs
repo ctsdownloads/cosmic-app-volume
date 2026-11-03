@@ -20,14 +20,14 @@ use cosmic::{
     cosmic_theme::Spacing,
     iced::{
         self, Alignment, Length, Subscription,
-        futures::StreamExt,
+        futures::channel::mpsc,
         widget::{self, column, row, slider},
         window,
     },
     surface, theme,
     widget::{Row, button, container, divider, icon, scrollable, space, text, toggler},
 };
-use cosmic_settings_sound_subscription as css;
+use cosmic_settings_sound as css;
 use iced::platform_specific::shell::wayland::commands::popup::{destroy_popup, get_popup};
 use mpris_subscription::{MprisRequest, MprisUpdate};
 use mpris2_zbus::player::PlaybackStatus;
@@ -52,7 +52,7 @@ pub struct Audio {
     /// Track the applet's popup window.
     popup: Option<window::Id>,
     /// The model from cosmic-settings for managing pipewire devices.
-    model: css::Model,
+    model: css::model::Model,
     /// Whether to expand the revealer of a source or sink device.
     is_open: IsOpen,
     /// Max slider volume for the sink device, as determined by the amplification property.
@@ -85,8 +85,8 @@ pub struct Audio {
 
 impl Audio {
     fn output_icon_name(&self) -> &'static str {
-        let volume = self.model.sink_volume;
-        let mute = self.model.sink_mute;
+        let volume = self.model.active_sink.volume;
+        let mute = self.model.active_sink.mute;
         if mute || volume == 0 {
             "audio-volume-muted-symbolic"
         } else if volume < 33 {
@@ -101,8 +101,8 @@ impl Audio {
     }
 
     fn input_icon_name(&self) -> &'static str {
-        let volume = self.model.source_volume;
-        let mute = self.model.source_mute;
+        let volume = self.model.active_source.volume;
+        let mute = self.model.active_source.mute;
         if mute || volume == 0 {
             "microphone-sensitivity-muted-symbolic"
         } else if volume < 33 {
@@ -162,6 +162,86 @@ pub enum Message {
 // on leave of applet, popup button is on top again
 
 impl Audio {
+    fn default_sink_node(&self) -> Option<u32> {
+        self.model
+            .default_sink
+            .or_else(|| self.model.sinks.active().and_then(|pos| self.model.sinks.id.get(pos).copied()))
+    }
+
+    fn default_source_node(&self) -> Option<u32> {
+        self.model
+            .default_source
+            .or_else(|| self.model.sources.active().and_then(|pos| self.model.sources.id.get(pos).copied()))
+    }
+
+    fn sink_labels(&self) -> Vec<String> {
+        self.model
+            .sinks
+            .sorted_display
+            .iter()
+            .map(ToString::to_string)
+            .collect()
+    }
+
+    fn source_labels(&self) -> Vec<String> {
+        self.model
+            .sources
+            .sorted_display
+            .iter()
+            .map(ToString::to_string)
+            .collect()
+    }
+
+    fn set_default_sink(&mut self, pos: usize) {
+        if let Some(&sorted_index) = self.model.sinks.sorted_index.get(pos)
+            && let Some(&node_id) = self.model.sinks.id.get(sorted_index as usize)
+        {
+            self.model.update(css::audio_client::Event::DefaultSink(node_id));
+        }
+    }
+
+    fn set_default_source(&mut self, pos: usize) {
+        if let Some(&sorted_index) = self.model.sources.sorted_index.get(pos)
+            && let Some(&node_id) = self.model.sources.id.get(sorted_index as usize)
+        {
+            self.model.update(css::audio_client::Event::DefaultSource(node_id));
+        }
+    }
+
+    fn toggle_sink_mute(&mut self) {
+        if let Some(node_id) = self.default_sink_node() {
+            let new_mute = !self.model.active_sink.mute;
+            self.model.update(css::audio_client::Event::NodeMute(node_id, new_mute));
+        }
+    }
+
+    fn toggle_source_mute(&mut self) {
+        if let Some(node_id) = self.default_source_node() {
+            let new_mute = !self.model.active_source.mute;
+            self.model.update(css::audio_client::Event::NodeMute(node_id, new_mute));
+        }
+    }
+
+    fn set_sink_volume(&mut self, volume: u32) {
+        if let Some(node_id) = self.default_sink_node() {
+            self.model.update(css::audio_client::Event::NodeVolume(
+                node_id,
+                volume,
+                self.model.active_sink.balance,
+            ));
+        }
+    }
+
+    fn set_source_volume(&mut self, volume: u32) {
+        if let Some(node_id) = self.default_source_node() {
+            self.model.update(css::audio_client::Event::NodeVolume(
+                node_id,
+                volume,
+                self.model.active_source.balance,
+            ));
+        }
+    }
+
     fn playback_buttons(&self) -> Vec<Element<'_, Message>> {
         let mut elements: Vec<Element<'_, Message>> = Vec::new();
         if self.player_status.is_some() && self.config.show_media_controls_in_top_panel {
@@ -264,10 +344,9 @@ impl cosmic::Application for Audio {
     const APP_ID: &'static str = "io.github.ctsdownloads.CosmicExtAppletAppVolume";
 
     fn init(core: cosmic::app::Core, _flags: ()) -> (Self, app::Task<Message>) {
-        let mut model = css::Model::default();
-        model.unplugged_text = "Unplugged".into();
-        model.hd_audio_text = "HD Audio".into();
-        model.usb_audio_text = "USB Audio".into();
+        let mut model = css::model::Model::default();
+        model.text.hd_audio = "HD Audio".into();
+        model.text.usb_audio = "USB Audio".into();
 
         crate::pulse::start();
 
@@ -342,42 +421,32 @@ impl cosmic::Application for Audio {
                 }
             }
             Message::Subscription(message) => {
-                return self
-                    .model
-                    .update(message)
-                    .map(|message| Message::Subscription(message).into());
+                match message {
+                    css::Message::Subscription(event) => {
+                        self.model.update(event);
+                    }
+                    css::Message::Client(_) => {}
+                }
             }
 
             Message::SetDefaultSink(pos) => {
-                return self
-                    .model
-                    .set_default_sink(pos)
-                    .map(|message| Message::Subscription(message).into());
+                self.set_default_sink(pos);
             }
 
             Message::SetDefaultSource(pos) => {
-                return self
-                    .model
-                    .set_default_source(pos)
-                    .map(|message| Message::Subscription(message).into());
+                self.set_default_source(pos);
             }
 
-            Message::ToggleSinkMute => self.model.toggle_sink_mute(),
+            Message::ToggleSinkMute => {self.toggle_sink_mute();}
 
-            Message::ToggleSourceMute => self.model.toggle_source_mute(),
+            Message::ToggleSourceMute => {self.toggle_source_mute();}
 
             Message::SetSinkVolume(volume) => {
-                return self
-                    .model
-                    .set_sink_volume(volume)
-                    .map(|message| Message::Subscription(message).into());
+                self.set_sink_volume(volume);
             }
 
             Message::SetSourceVolume(volume) => {
-                return self
-                    .model
-                    .set_source_volume(volume)
-                    .map(|message| Message::Subscription(message).into());
+                self.set_source_volume(volume);
             }
 
             Message::ToggleMediaControlsInTopPanel(enabled) => {
@@ -572,7 +641,11 @@ impl cosmic::Application for Audio {
             }),
             mpris_subscription::mpris_subscription(0).map(Message::Mpris),
             activation_token_subscription(0).map(Message::Token),
-            Subscription::run(|| css::watch().map(Message::Subscription)),
+            Subscription::run(|| {
+                iced::stream::channel(1, move |emitter: mpsc::Sender<Message>| async move {
+                    css::subscribe(emitter, Message::Subscription).await
+                })
+            }),
             crate::pulse::subscription().map(Message::PulseUpdate),
         ])
     }
@@ -594,7 +667,7 @@ impl cosmic::Application for Audio {
                 return Message::Ignore;
             }
 
-            let new_volume = (self.model.sink_volume as f64 + (scroll_vector as f64))
+            let new_volume = (self.model.active_sink.volume as f64 + (scroll_vector as f64))
                 .clamp(0.0, self.max_sink_volume as f64);
             Message::SetSinkVolume(new_volume as u32)
         });
@@ -648,19 +721,23 @@ impl cosmic::Application for Audio {
             space_xxs, space_s, ..
         } = theme::active().cosmic().spacing;
 
+        let sink_devices = self.sink_labels();
+        let source_devices = self.source_labels();
         let sink = self
             .model
-            .active_sink()
-            .and_then(|pos| self.model.sinks().get(pos));
+            .sinks
+            .active()
+            .and_then(|pos| sink_devices.get(pos));
         let source = self
             .model
-            .active_source()
-            .and_then(|pos| self.model.sources().get(pos));
+            .sources
+            .active()
+            .and_then(|pos| source_devices.get(pos));
 
         let mut audio_content = {
             let output_slider = slider(
                 0..=self.max_sink_volume,
-                self.model.sink_volume,
+                self.model.active_sink.volume,
                 Message::SetSinkVolume,
             )
             .width(Length::FillPortion(5))
@@ -668,7 +745,7 @@ impl cosmic::Application for Audio {
 
             let input_slider = slider(
                 0..=self.max_source_volume,
-                self.model.source_volume,
+                self.model.active_source.volume,
                 Message::SetSourceVolume,
             )
             .width(Length::FillPortion(5))
@@ -687,7 +764,7 @@ impl cosmic::Application for Audio {
                         .line_height(24)
                         .on_press(Message::ToggleSinkMute),
                         output_slider,
-                        container(text(&self.model.sink_volume_text).size(16))
+                        container(text(&self.model.active_sink.volume_text).size(16))
                             .width(Length::FillPortion(1))
                             .align_x(Alignment::End)
                     ]
@@ -706,7 +783,7 @@ impl cosmic::Application for Audio {
                         .line_height(24)
                         .on_press(Message::ToggleSourceMute),
                         input_slider,
-                        container(text(&self.model.source_volume_text).size(16))
+                        container(text(&self.model.active_source.volume_text).size(16))
                             .width(Length::FillPortion(1))
                             .align_x(Alignment::End)
                     ]
@@ -718,10 +795,10 @@ impl cosmic::Application for Audio {
                     self.is_open == IsOpen::Output,
                     fl!("output"),
                     match sink {
-                        Some(sink) => sink.to_owned(),
+                        Some(sink) => sink.clone(),
                         None => fl!("no-device"),
                     },
-                    self.model.sinks(),
+                    &sink_devices,
                     Message::OutputToggle,
                     Message::SetDefaultSink,
                 ),
@@ -729,10 +806,10 @@ impl cosmic::Application for Audio {
                     self.is_open == IsOpen::Input,
                     fl!("input"),
                     match source {
-                        Some(source) => source.to_owned(),
+                        Some(source) => source.clone(),
                         None => fl!("no-device"),
                     },
-                    self.model.sources(),
+                    &source_devices,
                     Message::InputToggle,
                     Message::SetDefaultSource,
                 )
